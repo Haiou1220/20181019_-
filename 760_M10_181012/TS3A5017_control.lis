@@ -1,0 +1,1244 @@
+                        .module TS3A5017_control.c
+                        .area text(rom, con, rel)
+ 0000                   .dbfile TS3A5017_control.c
+                        .area data(ram, con, rel)
+ 0000                   .dbfile TS3A5017_control.c
+ 0000           _sound::
+ 0000                   .blkb 1
+                        .area idata
+ 0000 03                .byte 3
+                        .area data(ram, con, rel)
+ 0001                   .dbfile TS3A5017_control.c
+ 0001                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0001                   .dbsym e sound _sound c
+                        .area text(rom, con, rel)
+ 0000                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0000                   .dbfunc e port_init _port_init fV
+                        .even
+ 0000           _port_init::
+ 0000                   .dbline -1
+ 0000                   .dbline 74
+ 0000           ; //**********************************************************//
+ 0000           ; //    TS3A5017音量控制源代码　　　　                                                  //
+ 0000           ; //    ATTINY24-20SSU                                                                          //
+ 0000           ; //    V1.0    2018.9.12                                                                       //
+ 0000           ; //                                                                                                            //
+ 0000           ; //**********************************************************//
+ 0000           ; //#include "760_M10_MACROH.h" //#define __760_M10_MACROH_H
+ 0000           ; //#include "760_M10_FUN.h" //#define FUN
+ 0000           ; //**********************************************************//
+ 0000           ; //全局变量
+ 0000           ; unsigned char sound=3;//控制声音变量,
+ 0000           ; //全局变量
+ 0000           ; 
+ 0000           ; #include <iot24v.h>
+ 0000           ; #include <macros.h>
+ 0000           ; 
+ 0000           ; //key1定义 SP  IN定义,低电平有效,PA4  输入0001 0000
+ 0000           ; #define SPCIN    (PINA & 0x10)
+ 0000           ; 
+ 0000           ; //key2定义 PTT IN定义,低电平有效,PA2  输入0000 0100
+ 0000           ; #define PTTIN   (PINA & 0x04) 
+ 0000           ; 
+ 0000           ; //key3定义，低电平有效,音量减少,PA0 输入0000 0001
+ 0000           ; #define  VOL_UP    (PINA & 0x01)
+ 0000           ; 
+ 0000           ; //key4定义，低电平有效，音量增加,PA6 输入0100 0000
+ 0000           ; #define  VOL_DOWN   (PINA & 0x40)
+ 0000           ; 
+ 0000           ; //定义1EN PA1,输出
+ 0000           ; #define EN1_0() PORTA &=~(1<<1)
+ 0000           ; #define EN1_1() PORTA |=(1<<1)
+ 0000           ;  
+ 0000           ; //定义PD PB1,输出
+ 0000           ; #define PD_0() PORTB &=~(1<<1)
+ 0000           ; #define PD_1() PORTB |=(1<<1)
+ 0000           ; 
+ 0000           ; //定义IN1 PB2,输出//
+ 0000           ; #define IN1_0() PORTB &=~(1<<2)
+ 0000           ; #define IN1_1() PORTB |=(1<<2)
+ 0000           ; 
+ 0000           ; //定义IN2 PA3,输出
+ 0000           ; #define IN2_0() PORTA &=~(1<<3)
+ 0000           ; #define IN2_1() PORTA |=(1<<3)
+ 0000           ; 
+ 0000           ; //定义led PB0, 输出
+ 0000           ; #define LED_0()  PORTB &=~(1<<0)
+ 0000           ; #define LED_1()  PORTB |=(1<<0)
+ 0000           ; 
+ 0000           ; //定义 MUOUT,PA7,输出
+ 0000           ; #define MUOUT_0()   PORTA &=~(1<<7)
+ 0000           ; #define MUOUT_1()   PORTA |=(1<<7)
+ 0000           ; 
+ 0000           ; //定义PTTOUT PA5,输出
+ 0000           ; #define PTTOUT_0()   PORTA &=~(1<<5)
+ 0000           ; #define PTTOUT_1()   PORTA |=(1<<5)
+ 0000           ; 
+ 0000           ; typedef enum enum_buttons     {   //按键类型
+ 0000           ;                               em_NoButton=0,
+ 0000           ;                               em_SPC_IN,
+ 0000           ;                               em_PTT_IN,
+ 0000           ;                               em_VOL_UP,
+ 0000           ;                               em_VOL_DOWN,
+ 0000           ;                               
+ 0000           ;                               }enum_buttons_type ;
+ 0000           ; 
+ 0000           ; 
+ 0000           ; //**********************************************************//
+ 0000           ; #define  ppt_down_mu()   MUOUT_0() 
+ 0000           ; #define  ppt_up_no_mu()   MUOUT_1() 
+ 0000           ; 
+ 0000           ; #define DELAY_TIME    7000  //DELAY_TIME
+ 0000           ; 
+ 0000           ; void port_init(void)
+ 0000           ; {
+ 0000                   .dbline 75
+ 0000           ;  PORTB = 0x01; //0000 0001//  PB0=1 LED关 PB1=0(节能复位）PB2=0 PB3=0（复位）
+ 0000 81E0              ldi R24,1
+ 0002 88BB              out 0x18,R24
+ 0004                   .dbline 76
+ 0004           ;  DDRB  = 0xFF; //1111 1111 全输出 
+ 0004 8FEF              ldi R24,255
+ 0006 87BB              out 0x17,R24
+ 0008                   .dbline 79
+ 0008           ; 
+ 0008           ;  
+ 0008           ;  DDRA  = 0xAA; //1010 1010, //PA0=0,输入;PA1=1输出,PA2输入,PA3输出,
+ 0008 8AEA              ldi R24,170
+ 000A 8ABB              out 0x1a,R24
+ 000C                   .dbline 82
+ 000C           ;                                                                                               //PA4输入，PA5输出，PA6输入,PA7输出
+ 000C           ;                                                                                               
+ 000C           ;  PORTA = 0x57; //1101 0111,      //PA3=0,PA2=1,PA1=1, PA0=1,                                                                                  
+ 000C 87E5              ldi R24,87
+ 000E 8BBB              out 0x1b,R24
+ 0010                   .dbline -2
+ 0010           L1:
+ 0010                   .dbline 0 ; func end
+ 0010 0895              ret
+ 0012                   .dbend
+ 0012                   .dbfunc e delay _delay fV
+ 0012           ;              n -> R16,R17
+                        .even
+ 0012           _delay::
+ 0012                   .dbline -1
+ 0012                   .dbline 86
+ 0012           ; }                                                                                                                                             //      PA7=0,PA6=1,PA5=0,PA4=1         
+ 0012           ;                                                                                                                                               //pa7是cro_spk 要初始化为0
+ 0012           ; void delay(unsigned int n)
+ 0012           ; {
+ 0012           L3:
+ 0012                   .dbline 88
+ 0012           ;       do
+ 0012           ;       {
+ 0012                   .dbline 89
+ 0012           ;               n--;
+ 0012 0150              subi R16,1
+ 0014 1040              sbci R17,0
+ 0016                   .dbline 90
+ 0016           ;       }while(n!=0);
+ 0016           L4:
+ 0016                   .dbline 90
+ 0016 0030              cpi R16,0
+ 0018 0107              cpc R16,R17
+ 001A D9F7              brne L3
+ 001C           X0:
+ 001C                   .dbline -2
+ 001C           L2:
+ 001C                   .dbline 0 ; func end
+ 001C 0895              ret
+ 001E                   .dbsym r n 16 i
+ 001E                   .dbend
+ 001E                   .dbfunc e system_init _system_init fV
+                        .even
+ 001E           _system_init::
+ 001E                   .dbline -1
+ 001E                   .dbline 94
+ 001E           ; }
+ 001E           ; 
+ 001E           ; void system_init(void)
+ 001E           ; {
+ 001E                   .dbline 96
+ 001E           ;       
+ 001E           ;               CLI(); //disable all interrupts
+ 001E F894              cli
+ 0020                   .dbline 97
+ 0020           ;     port_init();
+ 0020 EFDF              rcall _port_init
+ 0022                   .dbline 98
+ 0022           ;     delay(200);//延迟30周期*/
+ 0022 08EC              ldi R16,200
+ 0024 10E0              ldi R17,0
+ 0026                   .dbline -2
+ 0026           L6:
+ 0026                   .dbline 0 ; func end
+ 0026 F5CF              rjmp _delay
+ 0028                   .dbend
+ 0028                   .dbfunc e LED _LED fV
+ 0028           ;              i -> R20
+ 0028           ;              s -> R10
+                        .even
+ 0028           _LED::
+ 0028 AA92              st -y,R10
+ 002A 4A93              st -y,R20
+ 002C A02E              mov R10,R16
+ 002E                   .dbline -1
+ 002E                   .dbline 104
+ 002E           ; 
+ 002E           ; }
+ 002E           ; 
+ 002E           ; 
+ 002E           ; void LED(unsigned char s)//LED 闪烁
+ 002E           ; {
+ 002E                   .dbline 107
+ 002E           ;       unsigned char i;
+ 002E           ;       
+ 002E           ;       for(i=0;i<80;i++)
+ 002E 4427              clr R20
+ 0030 09C0              rjmp L11
+ 0032           L8:
+ 0032                   .dbline 108
+ 0032           ;       {
+ 0032                   .dbline 109
+ 0032           ;               LED_0();
+ 0032 C098              cbi 0x18,0
+ 0034                   .dbline 111
+ 0034           ; 
+ 0034           ;               delay(s);
+ 0034 0A2D              mov R16,R10
+ 0036 1127              clr R17
+ 0038 ECDF              rcall _delay
+ 003A                   .dbline 113
+ 003A           ;               
+ 003A           ;               LED_1();//灭
+ 003A C09A              sbi 0x18,0
+ 003C                   .dbline 114
+ 003C           ;               delay(s);
+ 003C 0A2D              mov R16,R10
+ 003E 1127              clr R17
+ 0040 E8DF              rcall _delay
+ 0042                   .dbline 115
+ 0042           ;       }
+ 0042           L9:
+ 0042                   .dbline 107
+ 0042 4395              inc R20
+ 0044           L11:
+ 0044                   .dbline 107
+ 0044 4035              cpi R20,80
+ 0046 A8F3              brlo L8
+ 0048           X1:
+ 0048                   .dbline -2
+ 0048           L7:
+ 0048                   .dbline 0 ; func end
+ 0048 4991              ld R20,y+
+ 004A A990              ld R10,y+
+ 004C 0895              ret
+ 004E                   .dbsym r i 20 c
+ 004E                   .dbsym r s 10 c
+ 004E                   .dbend
+ 004E                   .dbfunc e Delay_LED _Delay_LED fV
+ 004E           ;              a -> R16
+ 004E           ;              b -> R18
+                        .even
+ 004E           _Delay_LED::
+ 004E                   .dbline -1
+ 004E                   .dbline 119
+ 004E           ; } 
+ 004E           ; 
+ 004E           ; void Delay_LED(void)//
+ 004E           ; {
+ 004E                   .dbline 122
+ 004E           ;       unsigned char a, b;
+ 004E           ; 
+ 004E           ;       for (a = 1; a; a++)
+ 004E 01E0              ldi R16,1
+ 0050 06C0              rjmp L16
+ 0052           L13:
+ 0052                   .dbline 123
+ 0052           ;               for (b = 1; b<100; b++)
+ 0052 21E0              ldi R18,1
+ 0054 01C0              rjmp L20
+ 0056           L17:
+ 0056                   .dbline 124
+ 0056           ;                       ;
+ 0056           L18:
+ 0056                   .dbline 123
+ 0056 2395              inc R18
+ 0058           L20:
+ 0058                   .dbline 123
+ 0058 2436              cpi R18,100
+ 005A E8F3              brlo L17
+ 005C           X2:
+ 005C           L14:
+ 005C                   .dbline 122
+ 005C 0395              inc R16
+ 005E           L16:
+ 005E                   .dbline 122
+ 005E 0023              tst R16
+ 0060 C1F7              brne L13
+ 0062           X3:
+ 0062                   .dbline -2
+ 0062           L12:
+ 0062                   .dbline 0 ; func end
+ 0062 0895              ret
+ 0064                   .dbsym r a 16 c
+ 0064                   .dbsym r b 18 c
+ 0064                   .dbend
+ 0064                   .dbfunc e led_blink _led_blink fV
+ 0064           ;              i -> R20
+                        .even
+ 0064           _led_blink::
+ 0064 4A93              st -y,R20
+ 0066                   .dbline -1
+ 0066                   .dbline 129
+ 0066           ; }
+ 0066           ;       
+ 0066           ;       
+ 0066           ; void led_blink(void)
+ 0066           ; {
+ 0066                   .dbline 131
+ 0066           ;       unsigned char i;
+ 0066           ;       for(  i=0;i<2;i++)
+ 0066 4427              clr R20
+ 0068 05C0              rjmp L25
+ 006A           L22:
+ 006A                   .dbline 132
+ 006A           ;               {
+ 006A                   .dbline 134
+ 006A           ;               
+ 006A           ;               LED_0();//亮
+ 006A C098              cbi 0x18,0
+ 006C                   .dbline 135
+ 006C           ;               Delay_LED();//  
+ 006C F0DF              rcall _Delay_LED
+ 006E                   .dbline 136
+ 006E           ;               LED_1();//灭
+ 006E C09A              sbi 0x18,0
+ 0070                   .dbline 137
+ 0070           ;               Delay_LED();//
+ 0070 EEDF              rcall _Delay_LED
+ 0072                   .dbline 139
+ 0072           ;                       
+ 0072           ;               }
+ 0072           L23:
+ 0072                   .dbline 131
+ 0072 4395              inc R20
+ 0074           L25:
+ 0074                   .dbline 131
+ 0074 4230              cpi R20,2
+ 0076 C8F3              brlo L22
+ 0078           X4:
+ 0078                   .dbline -2
+ 0078           L21:
+ 0078                   .dbline 0 ; func end
+ 0078 4991              ld R20,y+
+ 007A 0895              ret
+ 007C                   .dbsym r i 20 c
+ 007C                   .dbend
+ 007C                   .dbfunc e control_sound _control_sound fV
+ 007C           ;    sound_level -> R16
+                        .even
+ 007C           _control_sound::
+ 007C 4A93              st -y,R20
+ 007E 5A93              st -y,R21
+ 0080                   .dbline -1
+ 0080                   .dbline 144
+ 0080           ; }
+ 0080           ; 
+ 0080           ; 
+ 0080           ; void control_sound(unsigned char sound_level)  
+ 0080           ;  {
+ 0080                   .dbline 145
+ 0080           ;   switch (sound_level)
+ 0080 402F              mov R20,R16
+ 0082 5527              clr R21
+ 0084 4130              cpi R20,1
+ 0086 E0E0              ldi R30,0
+ 0088 5E07              cpc R21,R30
+ 008A 89F0              breq L30
+ 008C           X5:
+ 008C 4230              cpi R20,2
+ 008E E0E0              ldi R30,0
+ 0090 5E07              cpc R21,R30
+ 0092 89F0              breq L31
+ 0094           X6:
+ 0094 4330              cpi R20,3
+ 0096 E0E0              ldi R30,0
+ 0098 5E07              cpc R21,R30
+ 009A 89F0              breq L32
+ 009C           X7:
+ 009C 4430              cpi R20,4
+ 009E E0E0              ldi R30,0
+ 00A0 5E07              cpc R21,R30
+ 00A2 89F0              breq L33
+ 00A4           X8:
+ 00A4 4530              cpi R20,5
+ 00A6 E0E0              ldi R30,0
+ 00A8 5E07              cpc R21,R30
+ 00AA 89F0              breq L34
+ 00AC           X9:
+ 00AC 13C0              rjmp L27
+ 00AE           L30:
+ 00AE                   .dbline 148
+ 00AE           ;    {
+ 00AE           ;          case (1):
+ 00AE           ;           EN1_1();//PA1,最大声
+ 00AE D99A              sbi 0x1b,1
+ 00B0                   .dbline 149
+ 00B0           ;                 IN2_0();//PA3  
+ 00B0 DB98              cbi 0x1b,3
+ 00B2                   .dbline 150
+ 00B2           ;                 IN1_0();//PB2
+ 00B2 C298              cbi 0x18,2
+ 00B4                   .dbline 151
+ 00B4           ;                   break;
+ 00B4 0FC0              rjmp L28
+ 00B6           L31:
+ 00B6                   .dbline 154
+ 00B6           ;                       
+ 00B6           ;          case (2):
+ 00B6           ;       EN1_0();//D-1S1
+ 00B6 D998              cbi 0x1b,1
+ 00B8                   .dbline 155
+ 00B8           ;                 IN2_0();
+ 00B8 DB98              cbi 0x1b,3
+ 00BA                   .dbline 156
+ 00BA           ;                 IN1_0();
+ 00BA C298              cbi 0x18,2
+ 00BC                   .dbline 157
+ 00BC           ;                   break;
+ 00BC 0BC0              rjmp L28
+ 00BE           L32:
+ 00BE                   .dbline 160
+ 00BE           ;                               
+ 00BE           ;          case (3):
+ 00BE           ;           EN1_0();//D-1S2
+ 00BE D998              cbi 0x1b,1
+ 00C0                   .dbline 161
+ 00C0           ;                 IN2_0();
+ 00C0 DB98              cbi 0x1b,3
+ 00C2                   .dbline 162
+ 00C2           ;                 IN1_1();
+ 00C2 C29A              sbi 0x18,2
+ 00C4                   .dbline 163
+ 00C4           ;                   break;
+ 00C4 07C0              rjmp L28
+ 00C6           L33:
+ 00C6                   .dbline 166
+ 00C6           ;          
+ 00C6           ;          case (4):
+ 00C6           ;           EN1_0();//D-1S3
+ 00C6 D998              cbi 0x1b,1
+ 00C8                   .dbline 167
+ 00C8           ;                 IN2_1();
+ 00C8 DB9A              sbi 0x1b,3
+ 00CA                   .dbline 168
+ 00CA           ;                 IN1_0();         
+ 00CA C298              cbi 0x18,2
+ 00CC                   .dbline 169
+ 00CC           ;                                       break;
+ 00CC 03C0              rjmp L28
+ 00CE           L34:
+ 00CE                   .dbline 172
+ 00CE           ;          
+ 00CE           ;          case (5):
+ 00CE           ;           EN1_0();//D-1S4
+ 00CE D998              cbi 0x1b,1
+ 00D0                   .dbline 173
+ 00D0           ;                 IN2_1();
+ 00D0 DB9A              sbi 0x1b,3
+ 00D2                   .dbline 174
+ 00D2           ;                 IN1_1();            
+ 00D2 C29A              sbi 0x18,2
+ 00D4                   .dbline 175
+ 00D4           ;                                       break; 
+ 00D4           L27:
+ 00D4           L28:
+ 00D4                   .dbline -2
+ 00D4           L26:
+ 00D4                   .dbline 0 ; func end
+ 00D4 5991              ld R21,y+
+ 00D6 4991              ld R20,y+
+ 00D8 0895              ret
+ 00DA                   .dbsym r sound_level 16 c
+ 00DA                   .dbend
+ 00DA                   .dbfunc e buttons_once_press _buttons_once_press fc
+                        .even
+ 00DA           _buttons_once_press::
+ 00DA                   .dbline -1
+ 00DA                   .dbline 189
+ 00DA           ;          }
+ 00DA           ; 
+ 00DA           ;  }
+ 00DA           ;  
+ 00DA           ; 
+ 00DA           ;  
+ 00DA           ; #define buttons_press(which_buttons)  ((which_buttons)==0)
+ 00DA           ; #define buttons_still_press(which_buttons)  ((which_buttons)==0)    //#define SQUARE(X) (X*X)
+ 00DA           ;                                                                                                                                                                                                                                                                       //#define SPCIN   (PINA & 0x10)
+ 00DA           ;                                                                                                                                                                                                                                                                       
+ 00DA           ;                                                                                                                                                                                                                                                                       
+ 00DA           ;                                                                                                                                                                                                                                                                       
+ 00DA           ; enum_buttons_type  buttons_once_press (void) 
+ 00DA           ; {
+ 00DA                   .dbline 190
+ 00DA           ;        if ( buttons_press(SPCIN) ){ /*em_NoButton=0,em_SPC_IN,em_PTT_IN,em_VOL_UP,em_VOL_DOWN,*/
+ 00DA CC99              sbic 0x19,4
+ 00DC 02C0              rjmp L36
+ 00DE           X10:
+ 00DE                   .dbline 190
+ 00DE                   .dbline 192
+ 00DE           ;                                                                                                                               /*SPCIN,PTTIN,VOL_UP,VOL_DOWN*///io口按键
+ 00DE           ;               return em_SPC_IN ;
+ 00DE 01E0              ldi R16,1
+ 00E0 0DC0              rjmp L35
+ 00E2           L36:
+ 00E2                   .dbline 195
+ 00E2           ;               
+ 00E2           ;        }
+ 00E2           ;               else if( buttons_press(PTTIN) ){
+ 00E2 CA99              sbic 0x19,2
+ 00E4 02C0              rjmp L38
+ 00E6           X11:
+ 00E6                   .dbline 195
+ 00E6                   .dbline 197
+ 00E6           ;                       
+ 00E6           ;                       return em_PTT_IN ;
+ 00E6 02E0              ldi R16,2
+ 00E8 09C0              rjmp L35
+ 00EA           L38:
+ 00EA                   .dbline 200
+ 00EA           ;                       
+ 00EA           ;         }
+ 00EA           ;               else if( buttons_press(VOL_UP) ){
+ 00EA C899              sbic 0x19,0
+ 00EC 02C0              rjmp L40
+ 00EE           X12:
+ 00EE                   .dbline 200
+ 00EE                   .dbline 202
+ 00EE           ;                       
+ 00EE           ;               return em_VOL_UP ;      
+ 00EE 03E0              ldi R16,3
+ 00F0 05C0              rjmp L35
+ 00F2           L40:
+ 00F2                   .dbline 205
+ 00F2           ;                       
+ 00F2           ;               }
+ 00F2           ;               else if( buttons_press(VOL_DOWN) ){
+ 00F2 CE99              sbic 0x19,6
+ 00F4 02C0              rjmp L42
+ 00F6           X13:
+ 00F6                   .dbline 205
+ 00F6                   .dbline 207
+ 00F6           ;                       
+ 00F6           ;                       return em_VOL_DOWN ;
+ 00F6 04E0              ldi R16,4
+ 00F8 01C0              rjmp L35
+ 00FA           L42:
+ 00FA                   .dbline 209
+ 00FA           ;                               
+ 00FA           ;               }else{
+ 00FA                   .dbline 211
+ 00FA           ;                       
+ 00FA           ;                       return em_NoButton ;
+ 00FA 0027              clr R16
+ 00FC                   .dbline -2
+ 00FC           L35:
+ 00FC                   .dbline 0 ; func end
+ 00FC 0895              ret
+ 00FE                   .dbend
+                        .area data(ram, con, rel)
+ 0001                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0001           L45:
+ 0001                   .blkb 1
+                        .area idata
+ 0001 00                .byte 0
+                        .area data(ram, con, rel)
+ 0002                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0002           L46:
+ 0002                   .blkb 1
+                        .area idata
+ 0002 00                .byte 0
+                        .area data(ram, con, rel)
+ 0003                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0003           L47:
+ 0003                   .blkb 1
+                        .area idata
+ 0003 01                .byte 1
+                        .area data(ram, con, rel)
+ 0004                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0004           L48:
+ 0004                   .blkb 1
+                        .area idata
+ 0004 00                .byte 0
+                        .area data(ram, con, rel)
+ 0005                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0005           L49:
+ 0005                   .blkb 1
+                        .area idata
+ 0005 00                .byte 0
+                        .area data(ram, con, rel)
+ 0006                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+                        .area text(rom, con, rel)
+ 00FE                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 00FE                   .dbfunc e get_key _get_key fc
+ 00FE                   .dbsym s return_num L49 c
+ 00FE                   .dbsym s mu_count_ok L48 c
+ 00FE                   .dbsym s do_mu_flag L47 c
+ 00FE                   .dbsym s mu_count L46 c
+ 00FE                   .dbsym s buttons_once_press_num L45 c
+                        .even
+ 00FE           _get_key::
+ 00FE 4A93              st -y,R20
+ 0100 5A93              st -y,R21
+ 0102                   .dbline -1
+ 0102                   .dbline 220
+ 0102           ;                       
+ 0102           ;               }       
+ 0102           ;                       
+ 0102           ;          
+ 0102           ; }
+ 0102           ; 
+ 0102           ; 
+ 0102           ; enum_buttons_type  get_key(void)
+ 0102           ; {  
+ 0102                   .dbline 229
+ 0102           ;         
+ 0102           ;        
+ 0102           ;       static  enum_buttons_type  buttons_once_press_num = em_NoButton;//哪一个按键按下了
+ 0102           ;       static  unsigned char      mu_count=0;//mu按键按时间，, static 局部静态提高运行效率
+ 0102           ;       static  unsigned char  do_mu_flag=1;                                                    // static 局部静态提高运行效率
+ 0102           ;       static  unsigned char  mu_count_ok=0; //长按时间到了 , static 局部静态提高运行效率
+ 0102           ;       static  unsigned char    return_num = em_NoButton ;//默认返回0
+ 0102           ;   
+ 0102           ;               buttons_once_press_num = buttons_once_press ();  //获取button，enum_buttons_type  buttons_once_press (void) ;
+ 0102 EBDF              rcall _buttons_once_press
+ 0104 00930100          sts L45,R16
+ 0108                   .dbline 239
+ 0108           ;   //test
+ 0108           ;  // if(buttons_once_press_num == em_VOL_UP )
+ 0108           ;  // {
+ 0108           ;   //  led_blink() ;led_blink() ;led_blink() ;led_blink() ;
+ 0108           ;  //   
+ 0108           ;  // } 
+ 0108           ;   //test
+ 0108           ;   
+ 0108           ;   
+ 0108           ;               if(buttons_once_press_num == em_SPC_IN  )//mute静音切换按键，按键要释放//两秒长按松开返回1//SPCIN() == 0
+ 0108 0130              cpi R16,1
+ 010A 09F0              breq X30
+ 010C 3FC0              rjmp L50
+ 010E           X30:
+ 010E           X14:
+ 010E                   .dbline 240
+ 010E           ;               {
+ 010E                   .dbline 241
+ 010E           ;                       delay(DELAY_TIME);//去抖动，修改为上变沿触发，这样就只会在按下时候触发一次
+ 010E 08E5              ldi R16,7000
+ 0110 1BE1              ldi R17,27
+ 0112 7FDF              rcall _delay
+ 0114                   .dbline 242
+ 0114           ;                       return_num=0;
+ 0114 2224              clr R2
+ 0116 20920500          sts L49,R2
+ 011A                   .dbline 243
+ 011A           ;                       if(buttons_still_press(SPCIN) )//SPCIN() == 0
+ 011A CC99              sbic 0x19,4
+ 011C 1FC0              rjmp L52
+ 011E           X15:
+ 011E                   .dbline 244
+ 011E           ;                       {       
+ 011E 19C0              rjmp L55
+ 0120           L54:
+ 0120                   .dbline 246
+ 0120           ;                               while(buttons_still_press(SPCIN) )//等待按键释放        ，以防多个按键同时按下  
+ 0120           ;                               {
+ 0120                   .dbline 247
+ 0120           ;                                       delay(10000); mu_count++; 
+ 0120 00E1              ldi R16,10000
+ 0122 17E2              ldi R17,39
+ 0124 76DF              rcall _delay
+ 0126                   .dbline 247
+ 0126 80910200          lds R24,L46
+ 012A 8F5F              subi R24,255    ; addi 1
+ 012C 80930200          sts L46,R24
+ 0130                   .dbline 248
+ 0130           ;                                       if(mu_count>=20)//大约2秒
+ 0130 8431              cpi R24,20
+ 0132 78F0              brlo L57
+ 0134           X16:
+ 0134                   .dbline 249
+ 0134           ;                                       {
+ 0134                   .dbline 250
+ 0134           ;                                                       if(do_mu_flag){
+ 0134 20900300          lds R2,L47
+ 0138 2220              tst R2
+ 013A 59F0              breq L59
+ 013C           X17:
+ 013C                   .dbline 250
+ 013C                   .dbline 251
+ 013C           ;                                                               return_num = em_SPC_IN ;        //按死只会做一次mu静音操作 
+ 013C 81E0              ldi R24,1
+ 013E 80930500          sts L49,R24
+ 0142                   .dbline 252
+ 0142           ;                                                               mu_count_ok = 1;
+ 0142 80930400          sts L48,R24
+ 0146                   .dbline 253
+ 0146           ;                                                               do_mu_flag=0;
+ 0146 2224              clr R2
+ 0148 20920300          sts L47,R2
+ 014C                   .dbline 254
+ 014C           ;                                                               mu_count = 0;
+ 014C 20920200          sts L46,R2
+ 0150                   .dbline 255
+ 0150           ;                                                               led_blink() ; 
+ 0150 89DF              rcall _led_blink
+ 0152                   .dbline 256
+ 0152           ;                                                 }
+ 0152           L59:
+ 0152                   .dbline 257
+ 0152           ;                                       }
+ 0152           L57:
+ 0152                   .dbline 259
+ 0152           ;                                               
+ 0152           ;                               }       
+ 0152           L55:
+ 0152                   .dbline 245
+ 0152 CC9B              sbis 0x19,4
+ 0154 E5CF              rjmp L54
+ 0156           X18:
+ 0156                   .dbline 260
+ 0156           ;                               mu_count = 0;
+ 0156 2224              clr R2
+ 0158 20920200          sts L46,R2
+ 015C                   .dbline 261
+ 015C           ;                       }
+ 015C           L52:
+ 015C                   .dbline 262
+ 015C           ;                       do_mu_flag=1; 
+ 015C 81E0              ldi R24,1
+ 015E 80930300          sts L47,R24
+ 0162                   .dbline 263
+ 0162           ;                       if (mu_count_ok == 0 ) //时间wei到了
+ 0162 20900400          lds R2,L48
+ 0166 2220              tst R2
+ 0168 29F4              brne L61
+ 016A           X19:
+ 016A                   .dbline 264
+ 016A           ;                               { 
+ 016A                   .dbline 265
+ 016A           ;                                       mu_count_ok = 0;return_num = em_NoButton ; 
+ 016A 2224              clr R2
+ 016C 20920400          sts L48,R2
+ 0170                   .dbline 265
+ 0170 20920500          sts L49,R2
+ 0174                   .dbline 267
+ 0174           ;                                       
+ 0174           ;                               }
+ 0174           L61:
+ 0174                   .dbline 269
+ 0174           ;                       
+ 0174           ;           return ( (return_num>em_NoButton)? em_SPC_IN : em_NoButton );   //长按return  1 ，无长按返回0 ;
+ 0174 80E0              ldi R24,0
+ 0176 20900500          lds R2,L49
+ 017A 8215              cp R24,R2
+ 017C 18F4              brsh L63
+ 017E           X20:
+ 017E 41E0              ldi R20,1
+ 0180 50E0              ldi R21,0
+ 0182 02C0              rjmp L64
+ 0184           L63:
+ 0184 4427              clr R20
+ 0186 5527              clr R21
+ 0188           L64:
+ 0188 042F              mov R16,R20
+ 018A 30C0              rjmp L44
+ 018C           L50:
+ 018C                   .dbline 274
+ 018C           ;               
+ 018C           ;               }
+ 018C           ; 
+ 018C           ;               
+ 018C           ;               if(buttons_once_press_num == em_PTT_IN)//PPT不需要，按键释放
+ 018C 80910100          lds R24,L45
+ 0190 8230              cpi R24,2
+ 0192 49F4              brne L65
+ 0194           X21:
+ 0194                   .dbline 275
+ 0194           ;               {
+ 0194                   .dbline 276
+ 0194           ;                       delay(DELAY_TIME);//去抖动
+ 0194 08E5              ldi R16,7000
+ 0196 1BE1              ldi R17,27
+ 0198 3CDF              rcall _delay
+ 019A                   .dbline 278
+ 019A           ;       
+ 019A           ;                       if(buttons_still_press(PTTIN) )  //buttons_still_press(PTTIN)//PTTIN() == 0
+ 019A CA99              sbic 0x19,2
+ 019C 02C0              rjmp L67
+ 019E           X22:
+ 019E                   .dbline 279
+ 019E           ;                       {
+ 019E                   .dbline 280
+ 019E           ;                               return em_PTT_IN;
+ 019E 02E0              ldi R16,2
+ 01A0 25C0              rjmp L44
+ 01A2           L67:
+ 01A2                   .dbline 283
+ 01A2           ;                       }
+ 01A2           ;             
+ 01A2           ;                               return em_NoButton;
+ 01A2 0027              clr R16
+ 01A4 23C0              rjmp L44
+ 01A6           L65:
+ 01A6                   .dbline 286
+ 01A6           ;               }
+ 01A6           ;               
+ 01A6           ;                if(buttons_once_press_num == em_VOL_UP)//加 按键释放，按一下加减一档
+ 01A6 80910100          lds R24,L45
+ 01AA 8330              cpi R24,3
+ 01AC 59F4              brne L69
+ 01AE           X23:
+ 01AE                   .dbline 287
+ 01AE           ;               {
+ 01AE                   .dbline 289
+ 01AE           ;                       
+ 01AE           ;                       delay(DELAY_TIME);//去抖动
+ 01AE 08E5              ldi R16,7000
+ 01B0 1BE1              ldi R17,27
+ 01B2 2FDF              rcall _delay
+ 01B4                   .dbline 290
+ 01B4           ;                       if(buttons_still_press(VOL_UP) )   //buttons_still_press(PTTIN)//VOL_UP() == 0
+ 01B4 C899              sbic 0x19,0
+ 01B6 04C0              rjmp L71
+ 01B8           X24:
+ 01B8                   .dbline 291
+ 01B8           ;                       {       
+ 01B8           L73:
+ 01B8                   .dbline 292
+ 01B8           ;                               while(buttons_still_press(VOL_UP) );//等待按键释放
+ 01B8           L74:
+ 01B8                   .dbline 292
+ 01B8 C89B              sbis 0x19,0
+ 01BA FECF              rjmp L73
+ 01BC           X25:
+ 01BC                   .dbline 293
+ 01BC           ;                               return em_VOL_UP;
+ 01BC 03E0              ldi R16,3
+ 01BE 16C0              rjmp L44
+ 01C0           L71:
+ 01C0                   .dbline 296
+ 01C0           ;                       }
+ 01C0           ;                                       
+ 01C0           ;                       return em_NoButton;
+ 01C0 0027              clr R16
+ 01C2 14C0              rjmp L44
+ 01C4           L69:
+ 01C4                   .dbline 300
+ 01C4           ;                       
+ 01C4           ;               }
+ 01C4           ;               
+ 01C4           ;                if(buttons_once_press_num == em_VOL_DOWN)//加 按键释放，按一下加减一档
+ 01C4 80910100          lds R24,L45
+ 01C8 8430              cpi R24,4
+ 01CA 59F4              brne L76
+ 01CC           X26:
+ 01CC                   .dbline 301
+ 01CC           ;               {
+ 01CC                   .dbline 302
+ 01CC           ;                       delay(DELAY_TIME);//去抖动
+ 01CC 08E5              ldi R16,7000
+ 01CE 1BE1              ldi R17,27
+ 01D0 20DF              rcall _delay
+ 01D2                   .dbline 303
+ 01D2           ;                       if(buttons_still_press(VOL_DOWN) ) //buttons_still_press(PTTIN)//VOL_DOWN() == 0
+ 01D2 CE99              sbic 0x19,6
+ 01D4 04C0              rjmp L78
+ 01D6           X27:
+ 01D6                   .dbline 304
+ 01D6           ;                       {
+ 01D6           L80:
+ 01D6                   .dbline 305
+ 01D6           ;                               while(buttons_still_press(VOL_DOWN) );//等待按键释放
+ 01D6           L81:
+ 01D6                   .dbline 305
+ 01D6 CE9B              sbis 0x19,6
+ 01D8 FECF              rjmp L80
+ 01DA           X28:
+ 01DA                   .dbline 306
+ 01DA           ;                               return em_VOL_DOWN;
+ 01DA 04E0              ldi R16,4
+ 01DC 07C0              rjmp L44
+ 01DE           L78:
+ 01DE                   .dbline 309
+ 01DE           ;                       }
+ 01DE           ;                       
+ 01DE           ;                               return em_NoButton;
+ 01DE 0027              clr R16
+ 01E0 05C0              rjmp L44
+ 01E2           L76:
+ 01E2                   .dbline 313
+ 01E2           ;                               
+ 01E2           ;               }
+ 01E2           ;               
+ 01E2           ;                if( buttons_once_press_num == em_NoButton )//无按下按键
+ 01E2 20900100          lds R2,L45
+ 01E6 2220              tst R2
+ 01E8 09F4              brne L83
+ 01EA           X29:
+ 01EA                   .dbline 314
+ 01EA           ;               {
+ 01EA                   .dbline 316
+ 01EA           ;                       
+ 01EA           ;                       return em_NoButton;//em_NoButton;
+ 01EA 0027              clr R16
+ 01EC           L83:
+ 01EC                   .dbline -2
+ 01EC           L44:
+ 01EC                   .dbline 0 ; func end
+ 01EC 5991              ld R21,y+
+ 01EE 4991              ld R20,y+
+ 01F0 0895              ret
+ 01F2                   .dbend
+                        .area data(ram, con, rel)
+ 0006                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 0006           L86:
+ 0006                   .blkb 1
+                        .area idata
+ 0006 00                .byte 0
+                        .area data(ram, con, rel)
+ 0007                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+                        .area text(rom, con, rel)
+ 01F2                   .dbfile D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+ 01F2                   .dbfunc e key_control _key_control fV
+ 01F2                   .dbsym s FlagBit_EN_MU L86 c
+ 01F2           ;  which_buttons -> R10
+                        .even
+ 01F2           _key_control::
+ 01F2 00D0              rcall push_xgset300C
+ 01F4 A02E              mov R10,R16
+ 01F6                   .dbline -1
+ 01F6                   .dbline 326
+ 01F6           ;               }
+ 01F6           ;       /*em_NoButton=0,em_SPC_IN,em_PTT_IN,em_VOL_UP,em_VOL_DOWN,枚举值*/
+ 01F6           ;       /*SPCIN,PTTIN,VOL_UP,VOL_DOWN*///io口按键       
+ 01F6           ;               
+ 01F6           ; } 
+ 01F6           ; 
+ 01F6           ; 
+ 01F6           ; 
+ 01F6           ; void key_control(enum_buttons_type  which_buttons)
+ 01F6           ; {
+ 01F6                   .dbline 331
+ 01F6           ;       /*em_NoButton=0,em_SPC_IN,em_PTT_IN,em_VOL_UP,em_VOL_DOWN,枚举值*/
+ 01F6           ;       /*SPCIN,PTTIN,VOL_UP,VOL_DOWN*///io口按键       
+ 01F6           ; static unsigned char FlagBit_EN_MU = 0;         
+ 01F6           ; 
+ 01F6           ; switch (which_buttons)
+ 01F6 4A2D              mov R20,R10
+ 01F8 5527              clr R21
+ 01FA 4030              cpi R20,0
+ 01FC 4507              cpc R20,R21
+ 01FE 09F4              brne X40
+ 0200 57C0              rjmp L88
+ 0202           X40:
+ 0202           X31:
+ 0202 4130              cpi R20,1
+ 0204 E0E0              ldi R30,0
+ 0206 5E07              cpc R21,R30
+ 0208 71F0              breq L90
+ 020A           X32:
+ 020A 4230              cpi R20,2
+ 020C E0E0              ldi R30,0
+ 020E 5E07              cpc R21,R30
+ 0210 C1F0              breq L93
+ 0212           X33:
+ 0212 4330              cpi R20,3
+ 0214 E0E0              ldi R30,0
+ 0216 5E07              cpc R21,R30
+ 0218 61F1              breq L97
+ 021A           X34:
+ 021A 4430              cpi R20,4
+ 021C E0E0              ldi R30,0
+ 021E 5E07              cpc R21,R30
+ 0220 09F4              brne X41
+ 0222 37C0              rjmp L100
+ 0224           X41:
+ 0224           X35:
+ 0224 45C0              rjmp L88
+ 0226           L90:
+ 0226                   .dbline 334
+ 0226           ; {
+ 0226           ;       case(em_SPC_IN):// mute静音
+ 0226           ;       {
+ 0226                   .dbline 336
+ 0226           ;               
+ 0226           ;       if (!FlagBit_EN_MU) //非静音状态可进； //开机第一次条件，FlagBit_EN_MU=0；可进
+ 0226 20900600          lds R2,L86
+ 022A 2220              tst R2
+ 022C 29F4              brne L91
+ 022E           X36:
+ 022E                   .dbline 337
+ 022E           ;       {
+ 022E                   .dbline 338
+ 022E           ;               MUOUT_0();//静音开
+ 022E DF98              cbi 0x1b,7
+ 0230                   .dbline 339
+ 0230           ;               FlagBit_EN_MU=1; 
+ 0230 81E0              ldi R24,1
+ 0232 80930600          sts L86,R24
+ 0236                   .dbline 341
+ 0236           ;               
+ 0236           ;       }
+ 0236 3CC0              rjmp L88
+ 0238           L91:
+ 0238                   .dbline 342
+ 0238           ;       else{
+ 0238                   .dbline 343
+ 0238           ;       MUOUT_1();//静音关
+ 0238 DF9A              sbi 0x1b,7
+ 023A                   .dbline 344
+ 023A           ;       FlagBit_EN_MU=0;
+ 023A 2224              clr R2
+ 023C 20920600          sts L86,R2
+ 0240                   .dbline 346
+ 0240           ;       
+ 0240           ;       }
+ 0240                   .dbline 349
+ 0240           ;     //led_blink() ;   
+ 0240           ;               //LED(120);//提醒
+ 0240           ;               break;
+ 0240 37C0              rjmp L88
+ 0242           L93:
+ 0242                   .dbline 354
+ 0242           ;       }
+ 0242           ;               
+ 0242           ;               
+ 0242           ;       case(em_PTT_IN):// PPT对讲
+ 0242           ;       { 
+ 0242                   .dbline 356
+ 0242           ;                       /*ppt_down_mu();//静音开启*/
+ 0242           ;                       PD_1();//POWER DOWN,电源开启非节能
+ 0242 C19A              sbi 0x18,1
+ 0244                   .dbline 357
+ 0244           ;                       delay(6000);delay(6000);delay(6000);delay(6000);delay(6000);
+ 0244 00E7              ldi R16,6000
+ 0246 17E1              ldi R17,23
+ 0248 E4DE              rcall _delay
+ 024A                   .dbline 357
+ 024A 00E7              ldi R16,6000
+ 024C 17E1              ldi R17,23
+ 024E E1DE              rcall _delay
+ 0250                   .dbline 357
+ 0250 00E7              ldi R16,6000
+ 0252 17E1              ldi R17,23
+ 0254 DEDE              rcall _delay
+ 0256                   .dbline 357
+ 0256 00E7              ldi R16,6000
+ 0258 17E1              ldi R17,23
+ 025A DBDE              rcall _delay
+ 025C                   .dbline 357
+ 025C 00E7              ldi R16,6000
+ 025E 17E1              ldi R17,23
+ 0260 D8DE              rcall _delay
+ 0262                   .dbline 359
+ 0262           ;                       
+ 0262           ;                       PTTOUT_1();//PPT录音开启
+ 0262 DD9A              sbi 0x1b,5
+ 0264                   .dbline 360
+ 0264           ;                       LED_0(); //LED灯亮
+ 0264 C098              cbi 0x18,0
+ 0266           L94:
+ 0266                   .dbline 362
+ 0266           ;                       
+ 0266           ;                       while( buttons_still_press(PTTIN)  );//等待PPT按键释放
+ 0266           L95:
+ 0266                   .dbline 362
+ 0266 CA9B              sbis 0x19,2
+ 0268 FECF              rjmp L94
+ 026A           X37:
+ 026A                   .dbline 364
+ 026A           ;                       
+ 026A           ;       PTTOUT_0();//PPT录音关
+ 026A DD98              cbi 0x1b,5
+ 026C                   .dbline 365
+ 026C           ;                       LED_1();//LED灯灭
+ 026C C09A              sbi 0x18,0
+ 026E                   .dbline 367
+ 026E           ;                       
+ 026E           ;                       PD_0();//POWER DOWN,电源关闭节能
+ 026E C198              cbi 0x18,1
+ 0270                   .dbline 370
+ 0270           ;                       /*ppt_up_no_mu();*/
+ 0270           ;                       
+ 0270           ;                       break;
+ 0270 1FC0              rjmp L88
+ 0272           L97:
+ 0272                   .dbline 374
+ 0272           ;       }
+ 0272           ;       
+ 0272           ;       case(em_VOL_UP):   // 音量UP // 5 ,4,3,2,1  小音量到大音量
+ 0272           ;       {       
+ 0272                   .dbline 377
+ 0272           ;                
+ 0272           ;   
+ 0272           ;               if(sound == 1)//音量最大
+ 0272 80910000          lds R24,_sound
+ 0276 8130              cpi R24,1
+ 0278 11F4              brne L98
+ 027A           X38:
+ 027A                   .dbline 378
+ 027A           ;               {
+ 027A                   .dbline 380
+ 027A           ;                       //发声报警音
+ 027A           ;                        led_blink();//LED闪烁
+ 027A F4DE              rcall _led_blink
+ 027C                   .dbline 381
+ 027C           ;               }
+ 027C 19C0              rjmp L88
+ 027E           L98:
+ 027E                   .dbline 383
+ 027E           ;               else
+ 027E           ;               {
+ 027E                   .dbline 384
+ 027E           ;                       sound--;//增音量   
+ 027E 80910000          lds R24,_sound
+ 0282 8150              subi R24,1
+ 0284 80930000          sts _sound,R24
+ 0288                   .dbline 385
+ 0288           ;                       control_sound(sound);
+ 0288 082F              mov R16,R24
+ 028A F8DE              rcall _control_sound
+ 028C                   .dbline 386
+ 028C           ;                       LED(60);
+ 028C 0CE3              ldi R16,60
+ 028E CCDE              rcall _LED
+ 0290                   .dbline 387
+ 0290           ;               }
+ 0290                   .dbline 388
+ 0290           ;               break;
+ 0290 0FC0              rjmp L88
+ 0292           L100:
+ 0292                   .dbline 392
+ 0292           ;       }
+ 0292           ;       
+ 0292           ;       case(em_VOL_DOWN): //em_VOL_DOWN
+ 0292           ;       {       
+ 0292                   .dbline 393
+ 0292           ;               if(sound == 5)//音量最小
+ 0292 80910000          lds R24,_sound
+ 0296 8530              cpi R24,5
+ 0298 11F4              brne L101
+ 029A           X39:
+ 029A                   .dbline 394
+ 029A           ;               {
+ 029A                   .dbline 396
+ 029A           ;                       //发声报警音
+ 029A           ;                        led_blink();//LED闪烁
+ 029A E4DE              rcall _led_blink
+ 029C                   .dbline 397
+ 029C           ;               }
+ 029C 09C0              rjmp L88
+ 029E           L101:
+ 029E                   .dbline 399
+ 029E           ;               else
+ 029E           ;               {
+ 029E                   .dbline 400
+ 029E           ;                       sound++;//减音量
+ 029E 80910000          lds R24,_sound
+ 02A2 8F5F              subi R24,255    ; addi 1
+ 02A4 80930000          sts _sound,R24
+ 02A8                   .dbline 401
+ 02A8           ;                       control_sound(sound);
+ 02A8 082F              mov R16,R24
+ 02AA E8DE              rcall _control_sound
+ 02AC                   .dbline 402
+ 02AC           ;                       LED(60);
+ 02AC 0CE3              ldi R16,60
+ 02AE BCDE              rcall _LED
+ 02B0                   .dbline 410
+ 02B0           ;                       
+ 02B0           ;                       
+ 02B0           ;                       
+ 02B0           ;                       /*
+ 02B0           ;                       LED_1(); 
+ 02B0           ;                       delay(DEY);led错了
+ 02B0           ;                       LED_0();*/
+ 02B0           ;               }
+ 02B0                   .dbline 411
+ 02B0           ;               break;
+ 02B0                   .dbline 416
+ 02B0           ;       }
+ 02B0           ;               
+ 02B0           ;       
+ 02B0           ;       case(em_NoButton): //无按键状态
+ 02B0           ;               {
+ 02B0                   .dbline 417
+ 02B0           ;                       break;                  //do nothing
+ 02B0                   .dbline 421
+ 02B0           ;               }
+ 02B0           ;       
+ 02B0           ;       default:
+ 02B0           ;               {
+ 02B0                   .dbline 422
+ 02B0           ;                       break;//do nothing
+ 02B0           L88:
+ 02B0                   .dbline -2
+ 02B0           L85:
+ 02B0                   .dbline 0 ; func end
+ 02B0 00C0              rjmp pop_xgset300C
+ 02B2                   .dbsym r which_buttons 10 c
+ 02B2                   .dbend
+ 02B2                   .dbfunc e main _main fV
+                        .even
+ 02B2           _main::
+ 02B2                   .dbline -1
+ 02B2                   .dbline 435
+ 02B2           ;               }
+ 02B2           ;               
+ 02B2           ;       
+ 02B2           ;       }/*switch*/
+ 02B2           ; }
+ 02B2           ; 
+ 02B2           ; 
+ 02B2           ; //**********************************************************//
+ 02B2           ; 
+ 02B2           ; 
+ 02B2           ; 
+ 02B2           ; void main(void)
+ 02B2           ; {
+ 02B2                   .dbline 437
+ 02B2           ;    
+ 02B2           ;       system_init();
+ 02B2 B5DE              rcall _system_init
+ 02B4                   .dbline 438
+ 02B4           ;       delay(30);//延迟30周期*/
+ 02B4 0EE1              ldi R16,30
+ 02B6 10E0              ldi R17,0
+ 02B8 ACDE              rcall _delay
+ 02BA 02C0              rjmp L106
+ 02BC           L105:
+ 02BC                   .dbline 441
+ 02BC           ; 
+ 02BC           ;       while(1)
+ 02BC           ;       {
+ 02BC                   .dbline 443
+ 02BC           ;       
+ 02BC           ;        key_control( get_key() );//do forever
+ 02BC 20DF              rcall _get_key
+ 02BE 99DF              rcall _key_control
+ 02C0                   .dbline 445
+ 02C0           ;                       
+ 02C0           ;       }/*while(1)*/
+ 02C0           L106:
+ 02C0                   .dbline 440
+ 02C0 FDCF              rjmp L105
+ 02C2           X42:
+ 02C2                   .dbline -2
+ 02C2           L104:
+ 02C2                   .dbline 0 ; func end
+ 02C2 0895              ret
+ 02C4                   .dbend
+ 02C4           ;               
+ 02C4           ;       
+ 02C4           ; }/*MAIN*/

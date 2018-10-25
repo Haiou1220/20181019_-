@@ -1,0 +1,842 @@
+Interrupt Vectors
+    00000 C014      RJMP	__text_start|__start
+
+Program Code (text area)
+__text_start|__start:
+    00015 EDCF      LDI	R28,0xDF
+    00016 E0D0      LDI	R29,0
+    00017 BFCD      OUT	0x3D,R28
+    00018 BFDE      OUT	0x3E,R29
+    00019 51CE      SUBI	R28,0x1E
+    0001A 40D0      SBCI	R29,0
+    0001B EA0A      LDI	R16,0xAA
+    0001C 8308      ST	Y,R16
+    0001D 2400      CLR	R0
+    0001E E6E7      LDI	R30,0x67
+    0001F E0F0      LDI	R31,0
+    00020 E010      LDI	R17,0
+    00021 36E7      CPI	R30,0x67
+    00022 07F1      CPC	R31,R17
+    00023 F011      BEQ	0x0026
+    00024 9201      ST	Z+,R0
+    00025 CFFB      RJMP	0x0021
+    00026 8300      ST	Z,R16
+    00027 E2E2      LDI	R30,0x22
+    00028 E0F0      LDI	R31,0
+    00029 E6A0      LDI	R26,0x60
+    0002A E0B0      LDI	R27,0
+    0002B E010      LDI	R17,0
+    0002C E000      LDI	R16,0
+    0002D BF0B      OUT	0x3B,R16
+    0002E 32E9      CPI	R30,0x29
+    0002F 07F1      CPC	R31,R17
+    00030 F021      BEQ	0x0035
+    00031 95C8      LPM
+    00032 9631      ADIW	R30,1
+    00033 920D      ST	X+,R0
+    00034 CFF9      RJMP	0x002E
+    00035 D15A      RCALL	_main
+_exit:
+    00036 CFFF      RJMP	_exit
+FILE: D:\GongShiCode\GHH_760_1011Day\760_M10_1011\760_M10_181012\TS3A5017_control.c
+(0001) //**********************************************************//
+(0002) //	TS3A5017音量控制源代码　　　　							//
+(0003) //	ATTINY24-20SSU         									//
+(0004) //	V1.0	2018.9.12									//
+(0005) //  														//
+(0006) //**********************************************************//
+(0007) //#include "760_M10_MACROH.h" //#define __760_M10_MACROH_H
+(0008) //#include "760_M10_FUN.h" //#define FUN
+(0009) //**********************************************************//
+(0010) //全局变量
+(0011) unsigned char sound=3;//控制声音变量,
+(0012) //全局变量
+(0013) 
+(0014) #include <iot24v.h>
+(0015) #include <macros.h>
+(0016) 
+(0017) //key1定义 SP  IN定义,低电平有效,PA4  输入0001 0000
+(0018) #define SPCIN    (PINA & 0x10)
+(0019) 
+(0020) //key2定义 PTT IN定义,低电平有效,PA2  输入0000 0100
+(0021) #define PTTIN   (PINA & 0x04)	
+(0022) 
+(0023) //key3定义，低电平有效,音量减少,PA0 输入0000 0001
+(0024) #define  VOL_UP    (PINA & 0x01)
+(0025) 
+(0026) //key4定义，低电平有效，音量增加,PA6 输入0100 0000
+(0027) #define  VOL_DOWN   (PINA & 0x40)
+(0028) 
+(0029) //定义1EN PA1,输出
+(0030) #define EN1_0() PORTA &=~(1<<1)
+(0031) #define EN1_1() PORTA |=(1<<1)
+(0032)  
+(0033) //定义PD PB1,输出
+(0034) #define PD_0() PORTB &=~(1<<1)
+(0035) #define PD_1() PORTB |=(1<<1)
+(0036) 
+(0037) //定义IN1 PB2,输出//
+(0038) #define IN1_0() PORTB &=~(1<<2)
+(0039) #define IN1_1() PORTB |=(1<<2)
+(0040) 
+(0041) //定义IN2 PA3,输出
+(0042) #define IN2_0() PORTA &=~(1<<3)
+(0043) #define IN2_1() PORTA |=(1<<3)
+(0044) 
+(0045) //定义led PB0, 输出
+(0046) #define LED_0()  PORTB &=~(1<<0)
+(0047) #define LED_1()  PORTB |=(1<<0)
+(0048) 
+(0049) //定义 MUOUT,PA7,输出
+(0050) #define MUOUT_0()   PORTA &=~(1<<7)
+(0051) #define MUOUT_1()   PORTA |=(1<<7)
+(0052) 
+(0053) //定义PTTOUT PA5,输出
+(0054) #define PTTOUT_0()   PORTA &=~(1<<5)
+(0055) #define PTTOUT_1()   PORTA |=(1<<5)
+(0056) 
+(0057) typedef enum enum_buttons	{   //按键类型
+(0058) 				em_NoButton=0,
+(0059) 				em_SPC_IN,
+(0060) 				em_PTT_IN,
+(0061) 				em_VOL_UP,
+(0062) 				em_VOL_DOWN,
+(0063) 				
+(0064) 				}enum_buttons_type ;
+(0065) 
+(0066) 
+(0067) //**********************************************************//
+(0068) #define  ppt_down_mu()   MUOUT_0() 
+(0069) #define  ppt_up_no_mu()   MUOUT_1() 
+(0070) 
+(0071) #define DELAY_TIME	7000  //DELAY_TIME
+(0072) 
+(0073) void port_init(void)
+(0074) {
+(0075)  PORTB = 0x01; //0000 0001//  PB0=1 LED关 PB1=0(节能复位）PB2=0 PB3=0（复位）
+_port_init:
+    00037 E081      LDI	R24,1
+    00038 BB88      OUT	0x18,R24
+(0076)  DDRB  = 0xFF; //1111 1111 全输出 
+    00039 EF8F      LDI	R24,0xFF
+    0003A BB87      OUT	0x17,R24
+(0077) 
+(0078)  
+(0079)  DDRA  = 0xAA; //1010 1010, //PA0=0,输入;PA1=1输出,PA2输入,PA3输出,
+    0003B EA8A      LDI	R24,0xAA
+    0003C BB8A      OUT	0x1A,R24
+(0080) 												//PA4输入，PA5输出，PA6输入,PA7输出
+(0081) 												
+(0082)  PORTA = 0x57; //1101 0111,      //PA3=0,PA2=1,PA1=1, PA0=1, 											
+    0003D E587      LDI	R24,0x57
+    0003E BB8B      OUT	0x1B,R24
+    0003F 9508      RET
+(0083) }																		//	PA7=0,PA6=1,PA5=0,PA4=1		
+(0084) 																		//pa7是cro_spk 要初始化为0
+(0085) void delay(unsigned int n)
+(0086) {
+(0087) 	do
+(0088) 	{
+(0089) 		n--;
+_delay:
+  n                    --> R16
+    00040 5001      SUBI	R16,1
+    00041 4010      SBCI	R17,0
+(0090) 	}while(n!=0);
+    00042 3000      CPI	R16,0
+    00043 0701      CPC	R16,R17
+    00044 F7D9      BNE	0x0040
+    00045 9508      RET
+(0091) }
+(0092) 
+(0093) void system_init(void)
+(0094) {
+(0095) 	
+(0096) 		CLI(); //disable all interrupts
+_system_init:
+    00046 94F8      BCLR	7
+(0097)     port_init();
+    00047 DFEF      RCALL	_port_init
+(0098)     delay(200);//延迟30周期*/
+    00048 EC08      LDI	R16,0xC8
+    00049 E010      LDI	R17,0
+    0004A CFF5      RJMP	_delay
+_LED:
+  i                    --> R20
+  s                    --> R10
+    0004B 92AA      ST	-Y,R10
+    0004C 934A      ST	-Y,R20
+    0004D 2EA0      MOV	R10,R16
+(0099) 
+(0100) }
+(0101) 
+(0102) 
+(0103) void LED(unsigned char s)//LED 闪烁
+(0104) {
+(0105) 	unsigned char i;
+(0106) 	
+(0107) 	for(i=0;i<80;i++)
+    0004E 2744      CLR	R20
+    0004F C009      RJMP	0x0059
+(0108) 	{
+(0109) 		LED_0();
+    00050 98C0      CBI	0x18,0
+(0110) 
+(0111) 		delay(s);
+    00051 2D0A      MOV	R16,R10
+    00052 2711      CLR	R17
+    00053 DFEC      RCALL	_delay
+(0112) 		
+(0113) 		LED_1();//灭
+    00054 9AC0      SBI	0x18,0
+(0114) 		delay(s);
+    00055 2D0A      MOV	R16,R10
+    00056 2711      CLR	R17
+    00057 DFE8      RCALL	_delay
+    00058 9543      INC	R20
+    00059 3540      CPI	R20,0x50
+    0005A F3A8      BCS	0x0050
+    0005B 9149      LD	R20,Y+
+    0005C 90A9      LD	R10,Y+
+    0005D 9508      RET
+(0115) 	}
+(0116) } 
+(0117) 
+(0118) void Delay_LED(void)//
+(0119) {
+(0120) 	unsigned char a, b;
+(0121) 
+(0122) 	for (a = 1; a; a++)
+_Delay_LED:
+  a                    --> R16
+  b                    --> R18
+    0005E E001      LDI	R16,1
+    0005F C006      RJMP	0x0066
+(0123) 		for (b = 1; b<100; b++)
+    00060 E021      LDI	R18,1
+    00061 C001      RJMP	0x0063
+    00062 9523      INC	R18
+    00063 3624      CPI	R18,0x64
+    00064 F3E8      BCS	0x0062
+    00065 9503      INC	R16
+    00066 2300      TST	R16
+    00067 F7C1      BNE	0x0060
+    00068 9508      RET
+_led_blink:
+  i                    --> R20
+    00069 934A      ST	-Y,R20
+(0124) 			;
+(0125) }
+(0126) 	
+(0127) 	
+(0128) void led_blink(void)
+(0129) {
+(0130) 	unsigned char i;
+(0131) 	for(  i=0;i<2;i++)
+    0006A 2744      CLR	R20
+    0006B C005      RJMP	0x0071
+(0132) 		{
+(0133) 		
+(0134) 		LED_0();//亮
+    0006C 98C0      CBI	0x18,0
+(0135) 		Delay_LED();//	
+    0006D DFF0      RCALL	_Delay_LED
+(0136) 		LED_1();//灭
+    0006E 9AC0      SBI	0x18,0
+(0137) 		Delay_LED();//
+    0006F DFEE      RCALL	_Delay_LED
+    00070 9543      INC	R20
+    00071 3042      CPI	R20,2
+    00072 F3C8      BCS	0x006C
+    00073 9149      LD	R20,Y+
+    00074 9508      RET
+_control_sound:
+  sound_level          --> R16
+    00075 934A      ST	-Y,R20
+    00076 935A      ST	-Y,R21
+(0138) 			
+(0139) 		}
+(0140) }
+(0141) 
+(0142) 
+(0143) void control_sound(unsigned char sound_level)  
+(0144)  {
+(0145)   switch (sound_level)
+    00077 2F40      MOV	R20,R16
+    00078 2755      CLR	R21
+    00079 3041      CPI	R20,1
+    0007A E0E0      LDI	R30,0
+    0007B 075E      CPC	R21,R30
+    0007C F089      BEQ	0x008E
+    0007D 3042      CPI	R20,2
+    0007E E0E0      LDI	R30,0
+    0007F 075E      CPC	R21,R30
+    00080 F089      BEQ	0x0092
+    00081 3043      CPI	R20,3
+    00082 E0E0      LDI	R30,0
+    00083 075E      CPC	R21,R30
+    00084 F089      BEQ	0x0096
+    00085 3044      CPI	R20,4
+    00086 E0E0      LDI	R30,0
+    00087 075E      CPC	R21,R30
+    00088 F089      BEQ	0x009A
+    00089 3045      CPI	R20,5
+    0008A E0E0      LDI	R30,0
+    0008B 075E      CPC	R21,R30
+    0008C F089      BEQ	0x009E
+    0008D C013      RJMP	0x00A1
+(0146)    {
+(0147) 	   case (1):
+(0148) 	    EN1_1();//PA1,最大声
+    0008E 9AD9      SBI	0x1B,1
+(0149) 		  IN2_0();//PA3  
+    0008F 98DB      CBI	0x1B,3
+(0150) 		  IN1_0();//PB2
+    00090 98C2      CBI	0x18,2
+(0151) 	            break;
+    00091 C00F      RJMP	0x00A1
+(0152) 	            	
+(0153) 	   case (2):
+(0154)       EN1_0();//D-1S1
+    00092 98D9      CBI	0x1B,1
+(0155) 		  IN2_0();
+    00093 98DB      CBI	0x1B,3
+(0156) 		  IN1_0();
+    00094 98C2      CBI	0x18,2
+(0157) 	            break;
+    00095 C00B      RJMP	0x00A1
+(0158) 				
+(0159) 	   case (3):
+(0160) 	    EN1_0();//D-1S2
+    00096 98D9      CBI	0x1B,1
+(0161) 		  IN2_0();
+    00097 98DB      CBI	0x1B,3
+(0162) 		  IN1_1();
+    00098 9AC2      SBI	0x18,2
+(0163) 	            break;
+    00099 C007      RJMP	0x00A1
+(0164) 	   
+(0165) 	   case (4):
+(0166) 	    EN1_0();//D-1S3
+    0009A 98D9      CBI	0x1B,1
+(0167) 		  IN2_1();
+    0009B 9ADB      SBI	0x1B,3
+(0168) 		  IN1_0();	   
+    0009C 98C2      CBI	0x18,2
+(0169) 	    				break;
+    0009D C003      RJMP	0x00A1
+(0170) 	   
+(0171) 	   case (5):
+(0172) 	    EN1_0();//D-1S4
+    0009E 98D9      CBI	0x1B,1
+(0173) 		  IN2_1();
+    0009F 9ADB      SBI	0x1B,3
+(0174) 		  IN1_1();	      
+    000A0 9AC2      SBI	0x18,2
+(0175) 	    				break; 
+    000A1 9159      LD	R21,Y+
+    000A2 9149      LD	R20,Y+
+    000A3 9508      RET
+(0176) 	   }
+(0177) 
+(0178)  }
+(0179)  
+(0180) 
+(0181)  
+(0182) #define buttons_press(which_buttons)  ((which_buttons)==0)
+(0183) #define buttons_still_press(which_buttons)  ((which_buttons)==0)    //#define SQUARE(X) (X*X)
+(0184) 																																	//#define SPCIN   (PINA & 0x10)
+(0185) 																																	
+(0186) 																																	
+(0187) 																																	
+(0188) enum_buttons_type  buttons_once_press (void) 
+(0189) {
+(0190) 	 if ( buttons_press(SPCIN) ){ /*em_NoButton=0,em_SPC_IN,em_PTT_IN,em_VOL_UP,em_VOL_DOWN,*/
+_buttons_once_press:
+    000A4 99CC      SBIC	0x19,4
+    000A5 C002      RJMP	0x00A8
+(0191) 	 															/*SPCIN,PTTIN,VOL_UP,VOL_DOWN*///io口按键
+(0192) 	 	return em_SPC_IN ;
+    000A6 E001      LDI	R16,1
+    000A7 C00D      RJMP	0x00B5
+(0193) 	 	
+(0194) 	 }
+(0195) 	 	else if( buttons_press(PTTIN) ){
+    000A8 99CA      SBIC	0x19,2
+    000A9 C002      RJMP	0x00AC
+(0196) 	 		
+(0197) 	 		return em_PTT_IN ;
+    000AA E002      LDI	R16,2
+    000AB C009      RJMP	0x00B5
+(0198) 	 		
+(0199) 	  }
+(0200) 	 	else if( buttons_press(VOL_UP) ){
+    000AC 99C8      SBIC	0x19,0
+    000AD C002      RJMP	0x00B0
+(0201) 	 		
+(0202) 	 	return em_VOL_UP ;	
+    000AE E003      LDI	R16,3
+    000AF C005      RJMP	0x00B5
+(0203) 	 		
+(0204) 	 	}
+(0205) 	 	else if( buttons_press(VOL_DOWN) ){
+    000B0 99CE      SBIC	0x19,6
+    000B1 C002      RJMP	0x00B4
+(0206) 	 		
+(0207) 	 		return em_VOL_DOWN ;
+    000B2 E004      LDI	R16,4
+    000B3 C001      RJMP	0x00B5
+(0208) 	 			
+(0209) 	 	}else{
+(0210) 	 		
+(0211) 	 		return em_NoButton ;
+    000B4 2700      CLR	R16
+    000B5 9508      RET
+_get_key:
+    000B6 934A      ST	-Y,R20
+    000B7 935A      ST	-Y,R21
+(0212) 	 		
+(0213) 	 	}	
+(0214) 	 		
+(0215) 	   
+(0216) }
+(0217) 
+(0218) 
+(0219) enum_buttons_type  get_key(void)
+(0220) {  
+(0221) 	  
+(0222) 	 
+(0223) 	static	enum_buttons_type  buttons_once_press_num = em_NoButton;//哪一个按键按下了
+(0224) 	static	unsigned char      mu_count=0;//mu按键按时间，, static 局部静态提高运行效率
+(0225) 	static  unsigned char  do_mu_flag=1;							// static 局部静态提高运行效率
+(0226)  	static  unsigned char  mu_count_ok=0; //长按时间到了 , static 局部静态提高运行效率
+(0227)  	static  unsigned char	 return_num = em_NoButton ;//默认返回0
+(0228)   
+(0229) 		buttons_once_press_num = buttons_once_press ();  //获取button，enum_buttons_type  buttons_once_press (void) ;
+    000B8 DFEB      RCALL	_buttons_once_press
+    000B9 9300 0061 STS	TS3A5017_control.c:buttons_once_press_num,R16
+(0230)   //test
+(0231)  // if(buttons_once_press_num == em_VOL_UP )
+(0232)  // {
+(0233)   //	led_blink() ;led_blink() ;led_blink() ;led_blink() ;
+(0234)  // 	
+(0235)  // }	
+(0236)   //test
+(0237)   
+(0238)   
+(0239) 		if(buttons_once_press_num == em_SPC_IN	)//mute静音切换按键，按键要释放//两秒长按松开返回1//SPCIN() == 0
+    000BB 3001      CPI	R16,1
+    000BC F009      BEQ	0x00BE
+    000BD C03F      RJMP	0x00FD
+(0240) 		{
+(0241) 			delay(DELAY_TIME);//去抖动，修改为上变沿触发，这样就只会在按下时候触发一次
+    000BE E508      LDI	R16,0x58
+    000BF E11B      LDI	R17,0x1B
+    000C0 DF7F      RCALL	_delay
+(0242) 			return_num=0;
+    000C1 2422      CLR	R2
+    000C2 9220 0065 STS	TS3A5017_control.c:return_num,R2
+(0243) 			if(buttons_still_press(SPCIN) )//SPCIN() == 0
+    000C4 99CC      SBIC	0x19,4
+    000C5 C01F      RJMP	0x00E5
+(0244) 			{	
+    000C6 C019      RJMP	0x00E0
+(0245) 				while(buttons_still_press(SPCIN) )//等待按键释放	，以防多个按键同时按下	
+(0246) 				{
+(0247) 					delay(10000); mu_count++; 
+    000C7 E100      LDI	R16,0x10
+    000C8 E217      LDI	R17,0x27
+    000C9 DF76      RCALL	_delay
+    000CA 9180 0062 LDS	R24,TS3A5017_control.c:mu_count
+    000CC 5F8F      SUBI	R24,0xFF
+    000CD 9380 0062 STS	TS3A5017_control.c:mu_count,R24
+(0248) 					if(mu_count>=20)//大约2秒
+    000CF 3184      CPI	R24,0x14
+    000D0 F078      BCS	0x00E0
+(0249) 					{
+(0250) 							if(do_mu_flag){
+    000D1 9020 0063 LDS	R2,TS3A5017_control.c:do_mu_flag
+    000D3 2022      TST	R2
+    000D4 F059      BEQ	0x00E0
+(0251) 								return_num = em_SPC_IN ;	//按死只会做一次mu静音操作 
+    000D5 E081      LDI	R24,1
+    000D6 9380 0065 STS	TS3A5017_control.c:return_num,R24
+(0252) 								mu_count_ok = 1;
+    000D8 9380 0064 STS	TS3A5017_control.c:mu_count_ok,R24
+(0253) 								do_mu_flag=0;
+    000DA 2422      CLR	R2
+    000DB 9220 0063 STS	TS3A5017_control.c:do_mu_flag,R2
+(0254) 								mu_count = 0;
+    000DD 9220 0062 STS	TS3A5017_control.c:mu_count,R2
+(0255) 								led_blink() ; 
+    000DF DF89      RCALL	_led_blink
+    000E0 9BCC      SBIS	0x19,4
+    000E1 CFE5      RJMP	0x00C7
+(0256) 						  }
+(0257) 					}
+(0258) 						
+(0259) 				}	
+(0260) 				mu_count = 0;
+    000E2 2422      CLR	R2
+    000E3 9220 0062 STS	TS3A5017_control.c:mu_count,R2
+(0261) 			}
+(0262) 			do_mu_flag=1; 
+    000E5 E081      LDI	R24,1
+    000E6 9380 0063 STS	TS3A5017_control.c:do_mu_flag,R24
+(0263) 			if (mu_count_ok == 0 ) //时间wei到了
+    000E8 9020 0064 LDS	R2,TS3A5017_control.c:mu_count_ok
+    000EA 2022      TST	R2
+    000EB F429      BNE	0x00F1
+(0264) 				{ 
+(0265) 					mu_count_ok = 0;return_num = em_NoButton ; 
+    000EC 2422      CLR	R2
+    000ED 9220 0064 STS	TS3A5017_control.c:mu_count_ok,R2
+    000EF 9220 0065 STS	TS3A5017_control.c:return_num,R2
+(0266) 					
+(0267) 				}
+(0268) 			
+(0269) 	    return ( (return_num>em_NoButton)? em_SPC_IN : em_NoButton );   //长按return  1 ，无长按返回0 ;
+    000F1 E080      LDI	R24,0
+    000F2 9020 0065 LDS	R2,TS3A5017_control.c:return_num
+    000F4 1582      CP	R24,R2
+    000F5 F418      BCC	0x00F9
+    000F6 E041      LDI	R20,1
+    000F7 E050      LDI	R21,0
+    000F8 C002      RJMP	0x00FB
+    000F9 2744      CLR	R20
+    000FA 2755      CLR	R21
+    000FB 2F04      MOV	R16,R20
+    000FC C030      RJMP	0x012D
+(0270) 		
+(0271) 		}
+(0272) 
+(0273) 		
+(0274) 		if(buttons_once_press_num == em_PTT_IN)//PPT不需要，按键释放
+    000FD 9180 0061 LDS	R24,TS3A5017_control.c:buttons_once_press_num
+    000FF 3082      CPI	R24,2
+    00100 F449      BNE	0x010A
+(0275) 		{
+(0276) 			delay(DELAY_TIME);//去抖动
+    00101 E508      LDI	R16,0x58
+    00102 E11B      LDI	R17,0x1B
+    00103 DF3C      RCALL	_delay
+(0277) 	
+(0278) 			if(buttons_still_press(PTTIN) )  //buttons_still_press(PTTIN)//PTTIN() == 0
+    00104 99CA      SBIC	0x19,2
+    00105 C002      RJMP	0x0108
+(0279) 			{
+(0280) 				return em_PTT_IN;
+    00106 E002      LDI	R16,2
+    00107 C025      RJMP	0x012D
+(0281) 			}
+(0282) 	      
+(0283) 				return em_NoButton;
+    00108 2700      CLR	R16
+    00109 C023      RJMP	0x012D
+(0284) 		}
+(0285) 		
+(0286) 		 if(buttons_once_press_num == em_VOL_UP)//加 按键释放，按一下加减一档
+    0010A 9180 0061 LDS	R24,TS3A5017_control.c:buttons_once_press_num
+    0010C 3083      CPI	R24,3
+    0010D F459      BNE	0x0119
+(0287) 		{
+(0288) 			
+(0289) 			delay(DELAY_TIME);//去抖动
+    0010E E508      LDI	R16,0x58
+    0010F E11B      LDI	R17,0x1B
+    00110 DF2F      RCALL	_delay
+(0290) 			if(buttons_still_press(VOL_UP) )   //buttons_still_press(PTTIN)//VOL_UP() == 0
+    00111 99C8      SBIC	0x19,0
+    00112 C004      RJMP	0x0117
+(0291) 			{	
+(0292) 				while(buttons_still_press(VOL_UP) );//等待按键释放
+    00113 9BC8      SBIS	0x19,0
+    00114 CFFE      RJMP	0x0113
+(0293) 				return em_VOL_UP;
+    00115 E003      LDI	R16,3
+    00116 C016      RJMP	0x012D
+(0294) 			}
+(0295) 					
+(0296) 			return em_NoButton;
+    00117 2700      CLR	R16
+    00118 C014      RJMP	0x012D
+(0297) 			
+(0298) 		}
+(0299) 		
+(0300) 		 if(buttons_once_press_num == em_VOL_DOWN)//加 按键释放，按一下加减一档
+    00119 9180 0061 LDS	R24,TS3A5017_control.c:buttons_once_press_num
+    0011B 3084      CPI	R24,4
+    0011C F459      BNE	0x0128
+(0301) 		{
+(0302) 			delay(DELAY_TIME);//去抖动
+    0011D E508      LDI	R16,0x58
+    0011E E11B      LDI	R17,0x1B
+    0011F DF20      RCALL	_delay
+(0303) 			if(buttons_still_press(VOL_DOWN) ) //buttons_still_press(PTTIN)//VOL_DOWN() == 0
+    00120 99CE      SBIC	0x19,6
+    00121 C004      RJMP	0x0126
+(0304) 			{
+(0305) 				while(buttons_still_press(VOL_DOWN) );//等待按键释放
+    00122 9BCE      SBIS	0x19,6
+    00123 CFFE      RJMP	0x0122
+(0306) 				return em_VOL_DOWN;
+    00124 E004      LDI	R16,4
+    00125 C007      RJMP	0x012D
+(0307) 			}
+(0308) 			
+(0309) 				return em_NoButton;
+    00126 2700      CLR	R16
+    00127 C005      RJMP	0x012D
+(0310) 				
+(0311) 		}
+(0312) 		
+(0313) 		 if( buttons_once_press_num == em_NoButton )//无按下按键
+    00128 9020 0061 LDS	R2,TS3A5017_control.c:buttons_once_press_num
+    0012A 2022      TST	R2
+    0012B F409      BNE	0x012D
+(0314) 		{
+(0315) 			
+(0316) 			return em_NoButton;//em_NoButton;
+    0012C 2700      CLR	R16
+    0012D 9159      LD	R21,Y+
+    0012E 9149      LD	R20,Y+
+    0012F 9508      RET
+_key_control:
+  which_buttons        --> R10
+    00130 D068      RCALL	push_xgset300C
+    00131 2EA0      MOV	R10,R16
+(0317) 		}
+(0318) 	/*em_NoButton=0,em_SPC_IN,em_PTT_IN,em_VOL_UP,em_VOL_DOWN,枚举值*/
+(0319) 	/*SPCIN,PTTIN,VOL_UP,VOL_DOWN*///io口按键	
+(0320) 		
+(0321) } 
+(0322) 
+(0323) 
+(0324) 
+(0325) void key_control(enum_buttons_type  which_buttons)
+(0326) {
+(0327) 	/*em_NoButton=0,em_SPC_IN,em_PTT_IN,em_VOL_UP,em_VOL_DOWN,枚举值*/
+(0328) 	/*SPCIN,PTTIN,VOL_UP,VOL_DOWN*///io口按键	
+(0329) static unsigned char FlagBit_EN_MU = 0;	  
+(0330) 
+(0331) switch (which_buttons)
+    00132 2D4A      MOV	R20,R10
+    00133 2755      CLR	R21
+    00134 3040      CPI	R20,0
+    00135 0745      CPC	R20,R21
+    00136 F409      BNE	0x0138
+    00137 C057      RJMP	0x018F
+    00138 3041      CPI	R20,1
+    00139 E0E0      LDI	R30,0
+    0013A 075E      CPC	R21,R30
+    0013B F071      BEQ	0x014A
+    0013C 3042      CPI	R20,2
+    0013D E0E0      LDI	R30,0
+    0013E 075E      CPC	R21,R30
+    0013F F0C1      BEQ	0x0158
+    00140 3043      CPI	R20,3
+    00141 E0E0      LDI	R30,0
+    00142 075E      CPC	R21,R30
+    00143 F161      BEQ	0x0170
+    00144 3044      CPI	R20,4
+    00145 E0E0      LDI	R30,0
+    00146 075E      CPC	R21,R30
+    00147 F409      BNE	0x0149
+    00148 C037      RJMP	0x0180
+    00149 C045      RJMP	0x018F
+(0332) {
+(0333) 	case(em_SPC_IN):// mute静音
+(0334) 	{
+(0335) 		
+(0336)   	if (!FlagBit_EN_MU) //非静音状态可进； //开机第一次条件，FlagBit_EN_MU=0；可进
+    0014A 9020 0066 LDS	R2,TS3A5017_control.c:FlagBit_EN_MU
+    0014C 2022      TST	R2
+    0014D F429      BNE	0x0153
+(0337)   	{
+(0338)   		MUOUT_0();//静音开
+    0014E 98DF      CBI	0x1B,7
+(0339)   		FlagBit_EN_MU=1; 
+    0014F E081      LDI	R24,1
+    00150 9380 0066 STS	TS3A5017_control.c:FlagBit_EN_MU,R24
+(0340)   		
+(0341)   	}
+    00152 C03C      RJMP	0x018F
+(0342)   	else{
+(0343)   	MUOUT_1();//静音关
+    00153 9ADF      SBI	0x1B,7
+(0344)   	FlagBit_EN_MU=0;
+    00154 2422      CLR	R2
+    00155 9220 0066 STS	TS3A5017_control.c:FlagBit_EN_MU,R2
+(0345)   	
+(0346)   	}
+(0347)     //led_blink() ;   
+(0348) 		//LED(120);//提醒
+(0349) 		break;
+    00157 C037      RJMP	0x018F
+(0350) 	}
+(0351) 		
+(0352) 		
+(0353) 	case(em_PTT_IN):// PPT对讲
+(0354) 	{ 
+(0355) 			/*ppt_down_mu();//静音开启*/
+(0356) 			PD_1();//POWER DOWN,电源开启非节能
+    00158 9AC1      SBI	0x18,1
+(0357) 			delay(6000);delay(6000);delay(6000);delay(6000);delay(6000);
+    00159 E700      LDI	R16,0x70
+    0015A E117      LDI	R17,0x17
+    0015B DEE4      RCALL	_delay
+    0015C E700      LDI	R16,0x70
+    0015D E117      LDI	R17,0x17
+    0015E DEE1      RCALL	_delay
+    0015F E700      LDI	R16,0x70
+    00160 E117      LDI	R17,0x17
+    00161 DEDE      RCALL	_delay
+    00162 E700      LDI	R16,0x70
+    00163 E117      LDI	R17,0x17
+    00164 DEDB      RCALL	_delay
+    00165 E700      LDI	R16,0x70
+    00166 E117      LDI	R17,0x17
+    00167 DED8      RCALL	_delay
+(0358) 			
+(0359) 			PTTOUT_1();//PPT录音开启
+    00168 9ADD      SBI	0x1B,5
+(0360) 			LED_0(); //LED灯亮
+    00169 98C0      CBI	0x18,0
+(0361) 			
+(0362) 			while( buttons_still_press(PTTIN)  );//等待PPT按键释放
+    0016A 9BCA      SBIS	0x19,2
+    0016B CFFE      RJMP	0x016A
+(0363) 			
+(0364)       PTTOUT_0();//PPT录音关
+    0016C 98DD      CBI	0x1B,5
+(0365) 			LED_1();//LED灯灭
+    0016D 9AC0      SBI	0x18,0
+(0366) 			
+(0367) 			PD_0();//POWER DOWN,电源关闭节能
+    0016E 98C1      CBI	0x18,1
+(0368) 			/*ppt_up_no_mu();*/
+(0369) 			
+(0370) 			break;
+    0016F C01F      RJMP	0x018F
+(0371) 	}
+(0372) 	
+(0373) 	case(em_VOL_UP):   // 音量UP // 5 ,4,3,2,1  小音量到大音量
+(0374) 	{	
+(0375) 		 
+(0376)   
+(0377) 		if(sound == 1)//音量最大
+    00170 9180 0060 LDS	R24,sound
+    00172 3081      CPI	R24,1
+    00173 F411      BNE	0x0176
+(0378) 		{
+(0379) 			//发声报警音
+(0380) 			 led_blink();//LED闪烁
+    00174 DEF4      RCALL	_led_blink
+(0381) 		}
+    00175 C019      RJMP	0x018F
+(0382) 		else
+(0383) 		{
+(0384) 			sound--;//增音量   
+    00176 9180 0060 LDS	R24,sound
+    00178 5081      SUBI	R24,1
+    00179 9380 0060 STS	sound,R24
+(0385) 			control_sound(sound);
+    0017B 2F08      MOV	R16,R24
+    0017C DEF8      RCALL	_control_sound
+(0386) 			LED(60);
+    0017D E30C      LDI	R16,0x3C
+    0017E DECC      RCALL	_LED
+(0387) 		}
+(0388) 		break;
+    0017F C00F      RJMP	0x018F
+(0389) 	}
+(0390) 	
+(0391) 	case(em_VOL_DOWN): //em_VOL_DOWN
+(0392) 	{	
+(0393) 		if(sound == 5)//音量最小
+    00180 9180 0060 LDS	R24,sound
+    00182 3085      CPI	R24,5
+    00183 F411      BNE	0x0186
+(0394) 		{
+(0395) 			//发声报警音
+(0396) 			 led_blink();//LED闪烁
+    00184 DEE4      RCALL	_led_blink
+(0397) 		}
+    00185 C009      RJMP	0x018F
+(0398) 		else
+(0399) 		{
+(0400) 			sound++;//减音量
+    00186 9180 0060 LDS	R24,sound
+    00188 5F8F      SUBI	R24,0xFF
+    00189 9380 0060 STS	sound,R24
+(0401) 			control_sound(sound);
+    0018B 2F08      MOV	R16,R24
+    0018C DEE8      RCALL	_control_sound
+(0402) 			LED(60);
+    0018D E30C      LDI	R16,0x3C
+    0018E DEBC      RCALL	_LED
+(0403) 			
+(0404) 			
+(0405) 			
+(0406) 			/*
+(0407) 			LED_1(); 
+(0408) 			delay(DEY);led错了
+(0409) 			LED_0();*/
+(0410) 		}
+(0411) 		break;
+(0412) 	}
+(0413) 		
+(0414) 	
+(0415) 	case(em_NoButton): //无按键状态
+(0416) 		{
+(0417) 			break;			//do nothing
+(0418) 		}
+(0419) 	
+(0420) 	default:
+(0421) 		{
+(0422) 			break;//do nothing
+    0018F C00E      RJMP	pop_xgset300C
+(0423) 		}
+(0424) 		
+(0425) 	
+(0426) 	}/*switch*/
+(0427) }
+(0428) 
+(0429) 
+(0430) //**********************************************************//
+(0431) 
+(0432) 
+(0433) 
+(0434) void main(void)
+(0435) {
+(0436)    
+(0437) 	system_init();
+_main:
+    00190 DEB5      RCALL	_system_init
+(0438) 	delay(30);//延迟30周期*/
+    00191 E10E      LDI	R16,0x1E
+    00192 E010      LDI	R17,0
+    00193 DEAC      RCALL	_delay
+    00194 C002      RJMP	0x0197
+(0439) 
+(0440) 	while(1)
+(0441) 	{
+(0442) 	
+(0443) 	 key_control( get_key() );//do forever
+FILE: <library>
+    00195 DF20      RCALL	_get_key
+    00196 DF99      RCALL	_key_control
+    00197 CFFD      RJMP	0x0195
+    00198 9508      RET
+push_xgset300C:
+    00199 935A      ST	-Y,R21
+    0019A 934A      ST	-Y,R20
+    0019B 92BA      ST	-Y,R11
+    0019C 92AA      ST	-Y,R10
+    0019D 9508      RET
+pop_xgset300C:
+    0019E 90A9      LD	R10,Y+
+    0019F 90B9      LD	R11,Y+
+    001A0 9149      LD	R20,Y+
+    001A1 9159      LD	R21,Y+
+    001A2 9508      RET
